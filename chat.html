@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Чат — прототип</title>
+<style>
+:root{
+  --paper:#EADFCF; --panel:#F2E9DB; --soft:#E0D3BE; --line:#D3C4AD; --ink:#3B332B; --muted:#6F6254;
+  --accent:#687050; --accent-ink:#F6EFE2; --mine:#D9D4B6; --theirs:#F8F2E7; --warn:#8F6122; --danger:#964636; --dot:#7E8A5C;
+  --ui:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --read:"Sitka Text","Iowan Old Style",Charter,Georgia,serif;
+  font-family:var(--ui);
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#25201B; --panel:#2C2620; --soft:#382F27; --line:#4A4035; --ink:#E8DECF; --muted:#A99A86;
+  --accent:#A9AE84; --accent-ink:#23201A; --mine:#45442F; --theirs:#352E27; --warn:#D6A866; --danger:#DE9383; --dot:#A9AE84;
+}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-size:15.5px;line-height:1.5}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;border-radius:12px;padding:9px 16px}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.ghost{background:var(--soft);color:var(--ink);font-weight:500}
+.btn.danger{background:transparent;color:var(--danger);font-weight:500;padding-left:4px;margin-right:auto}
+.icon{width:40px;height:40px;padding:0;display:grid;place-items:center;color:var(--muted);border-radius:50%}
+.icon:hover{background:var(--soft);color:var(--ink)}
+svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+
+#app{display:grid;grid-template-columns:336px 1fr;height:100%}
+#side{background:var(--panel);display:flex;flex-direction:column;min-width:0;min-height:0}
+#main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.bar{display:flex;align-items:center;gap:6px;padding:18px 16px 12px 24px;min-height:72px}
+.bar h1{font:400 22px/1.2 var(--read);margin:0;flex:1}
+#net{font-size:13px;margin:0 16px 8px;padding:10px 14px;color:var(--warn);background:var(--soft);border-radius:12px}
+#list{flex:1;overflow:auto;padding:4px 12px 16px}
+.row{display:flex;gap:14px;align-items:center;width:100%;text-align:left;padding:12px;border-radius:16px}
+.row:hover{background:color-mix(in srgb,var(--soft) 55%,transparent)}
+.row.on{background:var(--soft)}
+.ava{position:relative;flex:none;width:44px;height:44px;display:grid;place-items:center;font:400 18px/1 var(--read);color:#F8F2E7;border-radius:46% 54% 52% 48%/54% 46% 54% 46%}
+.ava.s1{border-radius:54% 46% 44% 56%/48% 56% 44% 52%}
+.ava.s2{border-radius:44% 56% 54% 46%/56% 48% 52% 44%}
+.ava.dot::after{content:"";position:absolute;right:-1px;bottom:1px;width:11px;height:11px;border-radius:50%;background:var(--dot);border:2.5px solid var(--panel)}
+.row.on .ava.dot::after{border-color:var(--soft)}
+.row .mid{flex:1;min-width:0}
+.row .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .pv{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rt{flex:none;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.badge{background:var(--accent);color:var(--accent-ink);border-radius:11px;min-width:22px;padding:1px 7px;font-weight:600;text-align:center}
+.empty{margin:auto;max-width:340px;text-align:center;color:var(--muted);padding:32px;font:400 17px/1.6 var(--read)}
+.empty b{color:var(--ink);font-weight:400}
+#list .empty{font-size:15.5px;margin-top:18vh}
+
+#head{padding-left:32px;padding-right:20px}
+#head .who{flex:1;min-width:0}
+#head .nm{font:400 20px/1.25 var(--read);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#head .st{font-size:13px;color:var(--muted)}
+#back{display:none}
+#msgs{flex:1;overflow:auto;padding:8px 32px 20px;display:flex;flex-direction:column;gap:6px}
+.day{align-self:center;font-size:12.5px;color:var(--muted);margin:22px 0 10px}
+.m{max-width:min(70%,560px);padding:10px 15px 7px;border-radius:18px 18px 18px 5px;background:var(--theirs);align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere;font:400 16.5px/1.5 var(--read)}
+.m.out{background:var(--mine);align-self:flex-end;border-radius:18px 18px 5px 18px}
+.m+.m.out,.m.out+.m:not(.out){margin-top:8px}
+.m .meta{display:flex;justify-content:flex-end;align-items:center;gap:5px;font:400 11.5px/1.4 var(--ui);color:var(--muted);margin-top:2px}
+.m .meta svg{width:14px;height:14px}
+.m.q .meta{color:var(--warn)}
+.m.r .meta svg{color:var(--accent)}
+.invite{align-self:center;max-width:420px;text-align:center;color:var(--muted);padding:16px;margin:auto 0;font:400 16px/1.6 var(--read)}
+.code{font:500 15px/1.5 ui-monospace,Consolas,monospace;letter-spacing:.4px;color:var(--ink);background:var(--theirs);border-radius:14px;padding:14px;margin:16px 0;user-select:all;overflow-wrap:anywhere}
+#form{display:flex;gap:10px;align-items:flex-end;padding:8px 32px 24px}
+#text{flex:1;resize:none;max-height:140px;border:0;border-radius:22px;padding:11px 18px;background:var(--theirs);font:400 16.5px/1.5 var(--read)}
+#text::placeholder{color:var(--muted)}
+#text:focus-visible{outline:1.5px solid var(--line);outline-offset:0}
+.btn:disabled{opacity:.6}
+#send{flex:none;width:42px;height:42px;margin-bottom:3px;padding:0;display:grid;place-items:center;border-radius:48% 52% 50% 50%/54% 48% 52% 46%}
+
+
+/* ---------- времена года: цвет и форма функциональных кнопок ---------- */
+:root{--accent-text:var(--accent)}
+:root[data-season=autumn]{--paper:#EEDFC2;--panel:#F5E9D1;--soft:#E6D0A6;--line:#D9BF90;--ink:#3B3024;--muted:#6C5B43;--mine:#E8C98C;--theirs:#FBF3E2;--accent:#CB8C3C;--accent-ink:#2B200F;--accent-text:#865613;--dot:#C08535}
+:root[data-season=winter]{--paper:#DEE5EA;--panel:#E8EEF2;--soft:#CFD9E0;--line:#BCC9D2;--ink:#2B343A;--muted:#566570;--mine:#C5D5DF;--theirs:#F3F6F8;--accent:#7E9BAD;--accent-ink:#14212A;--accent-text:#446273;--dot:#7592A4;--warn:#7A5A2A}
+:root[data-season=spring]{--paper:#E6EBCF;--panel:#EFF2DD;--soft:#D8E0B8;--line:#C6D0A0;--ink:#313526;--muted:#5E6647;--mine:#CFDDA2;--theirs:#F7F8EA;--accent:#94B160;--accent-ink:#1D2810;--accent-text:#516C28;--dot:#C597A0}
+:root[data-season=summer]{--paper:#DDE5D0;--panel:#E7EDDB;--soft:#CBD8BB;--line:#B7C7A5;--ink:#2C3327;--muted:#56634C;--mine:#BFD3A8;--theirs:#F3F6EC;--accent:#5C7D49;--accent-ink:#F3F2E4;--accent-text:#446333;--dot:#68894F}
+@media (prefers-color-scheme:dark){
+  :root[data-season=autumn]{--paper:#261F16;--panel:#2E261B;--soft:#3B301F;--line:#4E3F28;--ink:#EFE2CB;--muted:#B09E83;--mine:#5A4421;--theirs:#362D21;--accent:#D49A4A;--accent-ink:#251B0C;--accent-text:#E2B062;--dot:#D49A4A}
+  :root[data-season=winter]{--paper:#1B2126;--panel:#21282E;--soft:#2A333A;--line:#38444D;--ink:#DEE6EB;--muted:#96A5AF;--mine:#2F4654;--theirs:#283038;--accent:#86A6B9;--accent-ink:#101A20;--accent-text:#A6C2D2;--dot:#86A6B9;--warn:#D6A866}
+  :root[data-season=spring]{--paper:#1F2318;--panel:#262B1D;--soft:#313824;--line:#424B30;--ink:#E6EAD6;--muted:#A2AB8B;--mine:#45552A;--theirs:#2D3323;--accent:#A5C272;--accent-ink:#18200D;--accent-text:#BBD38E;--dot:#D3A7AF}
+  :root[data-season=summer]{--paper:#1A2119;--panel:#20281F;--soft:#2A3528;--line:#384635;--ink:#DFE7DA;--muted:#96A591;--mine:#32502F;--theirs:#283127;--accent:#7FA36B;--accent-ink:#131C10;--accent-text:#A2C290;--dot:#8FB07B}
+}
+.m.r .meta svg{color:var(--accent-text)}
+#bNew{width:36px;height:36px;margin-left:2px;color:var(--ink)}
+#bNew .glyph,#send .glyph{width:15px;height:15px;stroke-width:2}
+#sprig{display:inline-block;vertical-align:-2px;margin-left:9px;color:var(--accent-text)}
+#sprig svg{width:18px;height:18px;stroke-width:1.4}
+/* кнопки по временам года: контуры листа, льдинки и бутона, без деталей внутри */
+#send,#bNew{position:relative;background:none;border-radius:50%;overflow:visible}
+#bNew:hover{background:none}
+#send .shape,#bNew .shape{position:absolute;inset:0;width:100%;height:100%;stroke:none}
+#send .glyph,#bNew .glyph{position:relative}
+.shape .body{fill:var(--accent);stroke:var(--accent);stroke-width:1.2;stroke-linejoin:round}
+.shape .veins{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-linecap:round}
+#bNew .shape .body{fill:color-mix(in srgb,var(--accent) 42%,var(--panel));stroke:color-mix(in srgb,var(--accent) 42%,var(--panel))}
+#bNew .shape .veins{stroke:color-mix(in srgb,var(--accent) 42%,var(--panel))}
+#send:hover .body,#bNew:hover .body{filter:brightness(1.06)}
+#send{color:var(--accent-ink)}
+dialog select{width:100%;border:0;border-radius:12px;padding:11px 14px;background:var(--theirs);font:inherit;color:inherit}
+
+dialog{border:0;border-radius:22px;background:var(--panel);color:var(--ink);padding:28px;width:min(440px,calc(100vw - 32px));box-shadow:0 24px 60px rgba(40,36,30,.22)}
+dialog::backdrop{background:rgba(40,36,30,.38)}
+dialog h2{margin:0 0 14px;font:400 22px/1.25 var(--read)}
+dialog label{display:block;font-size:13px;color:var(--muted);margin:16px 0 6px}
+dialog input[type=text]{width:100%;border:0;border-radius:12px;padding:11px 14px;background:var(--theirs)}
+dialog p{color:var(--muted);font-size:14px;margin:10px 0}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:22px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:14px}
+.tabs button{flex:1;padding:8px 10px;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--panel);color:var(--ink);font-weight:600}
+.err{color:var(--danger);font-size:13px;min-height:18px;margin-top:6px}
+[hidden]{display:none!important}
+
+@media (max-width:720px){
+  #app{grid-template-columns:1fr}
+  #main{display:none}
+  body.open #side{display:none}
+  body.open #main{display:flex}
+  #back{display:grid}
+  #head{padding-left:8px;padding-right:8px}
+  #msgs{padding:8px 16px 16px}
+  #form{padding:8px 12px 14px}
+  .m{max-width:84%}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="bar">
+      <h1>Чаты<span id="sprig" aria-hidden="true"></span></h1>
+      <button class="icon" id="bSettings" title="Настройки" aria-label="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      <button class="icon" id="bNew" title="Новый чат" aria-label="Новый чат"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <div id="net" hidden></div>
+    <div id="list"></div>
+  </aside>
+  <main id="main">
+    <div class="empty" id="nochat">Выбери чат или начни новый.<br>Переписка хранится <b>только на этом устройстве</b>.</div>
+    <div class="bar" id="head" hidden>
+      <button class="icon" id="back" aria-label="Назад к списку"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="who"><div class="nm" id="hName"></div><div class="st" id="hStatus"></div></div>
+      <button class="icon" id="bChat" title="О чате" aria-label="О чате"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+    </div>
+    <div id="msgs" hidden></div>
+    <form id="form" hidden>
+      <textarea id="text" rows="1" placeholder="Сообщение" aria-label="Сообщение"></textarea>
+      <button class="btn" id="send" type="submit" aria-label="Отправить" title="Отправить"><svg viewBox="0 0 24 24"><path d="M12 19V6M6 11.5L12 5.5l6 6"/></svg></button>
+    </form>
+  </main>
+</div>
+
+<dialog id="dName">
+  <h2>Как тебя зовут?</h2>
+  <p>Имя увидят твои собеседники. Аккаунтов и регистрации нет: всё лежит на этом устройстве.</p>
+  <form method="dialog" id="fName">
+    <input type="text" id="iName" maxlength="40" placeholder="Имя" required>
+    <div class="acts"><button class="btn" type="submit">Готово</button></div>
+  </form>
+</dialog>
+
+<dialog id="dNew">
+  <h2>Новый чат</h2>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tCreate" aria-selected="true">Пригласить</button>
+    <button type="button" role="tab" id="tJoin" aria-selected="false">Ввести код</button>
+  </div>
+  <form id="fNew">
+    <p id="newHint"></p>
+    <div id="joinBox" hidden>
+      <label for="iCode">Код приглашения</label>
+      <input type="text" id="iCode" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
+    </div>
+    <label for="iPeer">Имя собеседника (необязательно)</label>
+    <input type="text" id="iPeer" maxlength="40" placeholder="Подставится само, когда он выйдет на связь">
+    <div class="err" id="newErr"></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" data-close>Отмена</button>
+      <button class="btn" type="submit" id="newOk">Создать</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dChat">
+  <h2>О чате</h2>
+  <label for="iRename">Имя собеседника</label>
+  <input type="text" id="iRename" maxlength="40">
+  <label>Код приглашения</label>
+  <div class="code" id="chatCode"></div>
+  <p>Код — это ключ к чату. Передавай его только собеседнику: любой, у кого он есть, сможет подключиться.</p>
+  <div class="acts">
+    <button class="btn danger" type="button" id="bDelete">Удалить чат</button>
+    <button class="btn ghost" type="button" id="bCopy">Скопировать код</button>
+    <button class="btn" type="button" id="bRenameOk">Сохранить</button>
+  </div>
+</dialog>
+
+<dialog id="dSettings">
+  <h2>Настройки</h2>
+  <label for="iMe">Твоё имя</label>
+  <input type="text" id="iMe" maxlength="40">
+  <p>Чаты и сообщения хранятся только в этом браузере на этом устройстве. Если очистить данные браузера, они пропадут, поэтому иногда сохраняй резервную копию.</p>
+  <label for="iSeason">Время года в оформлении</label>
+  <select id="iSeason">
+    <option value="">По календарю</option><option value="autumn">Осень</option><option value="winter">Зима</option><option value="spring">Весна</option><option value="summer">Лето</option>
+  </select>
+  <p id="profNote" hidden></p>
+  <label>Состояние связи</label>
+  <div class="code" id="diag" style="font:400 13px/1.6 var(--ui);letter-spacing:0;margin:0;white-space:pre-line;user-select:text"></div>
+  <div class="acts">
+    <button class="btn ghost" type="button" id="bExport">Сохранить копию в файл</button>
+    <button class="btn ghost" type="button" id="bImport">Восстановить из файла</button>
+    <button class="btn" type="button" id="bMeOk">Готово</button>
+  </div>
+  <input type="file" id="iFile" accept="application/json,.json" hidden>
+</dialog>
+
+<script>
+'use strict';
+const TRYSTERO_URL = 'https://cdn.jsdelivr.net/npm/trystero@0.25.2/+esm';
+const APP_ID = 'ochered-local-chat-v1';
+const Q = new URLSearchParams(location.search);
+const PROFILE = (Q.get('p') || '').replace(/[^\w-]/g, '').slice(0, 20);
+const LOCAL = Q.get('t') === 'local';          // тестовый транспорт между вкладками, без интернета
+const DB_NAME = 'ochered-chat' + (PROFILE ? '-' + PROFILE : '');
+const ALPH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const $ = id => document.getElementById(id);
+
+/* ---------- хранилище (IndexedDB) ---------- */
+let db;
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('kv');
+      d.createObjectStore('chats', {keyPath: 'id'});
+      d.createObjectStore('messages', {keyPath: 'id'});
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function tx(store, mode, fn) {
+  return new Promise((res, rej) => {
+    const t = db.transaction(store, mode);
+    const out = fn(t.objectStore(store));
+    t.oncomplete = () => res(out && out.result);
+    t.onerror = t.onabort = () => rej(t.error);
+  });
+}
+const put = (s, v, k) => tx(s, 'readwrite', o => o.put(v, k)).catch(e => console.error('save', e));
+const del = (s, k) => tx(s, 'readwrite', o => o.delete(k)).catch(e => console.error('del', e));
+const all = s => tx(s, 'readonly', o => o.getAll());
+const getKV = k => tx('kv', 'readonly', o => o.get(k));
+
+/* ---------- состояние ---------- */
+const S = {me: {name: ''}, chats: new Map(), msgs: new Map(), conns: new Map(), active: null};
+const msgsOf = id => { if (!S.msgs.has(id)) S.msgs.set(id, []); return S.msgs.get(id); };
+const isOnline = id => !!(S.conns.get(id) && S.conns.get(id).peers.size);
+
+function rnd(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return a; }
+const uid = () => [...rnd(16)].map(b => b.toString(16).padStart(2, '0')).join('');
+function genCode() {
+  let s = '';
+  while (s.length < 30) for (const b of rnd(40)) { const v = b & 31; if (v < ALPH.length && s.length < 30) s += ALPH[v]; }
+  return s;
+}
+const fmtCode = s => s.match(/.{5}/g).join('-');
+function parseCode(str) {
+  const s = String(str).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (s.length !== 30 || [...s].some(c => !ALPH.includes(c))) return null;
+  return {code: s, room: s.slice(0, 10), pass: s.slice(10)};
+}
+
+/* ---------- транспорт: прямое соединение между устройствами ---------- */
+let trystero, retryTimer, T = null;
+function loadTrystero() {
+  if (!trystero) trystero = import(TRYSTERO_URL).catch(e => { trystero = null; throw e; });
+  return trystero;
+}
+function setNet(msg) { $('net').hidden = !msg; $('net').textContent = msg || ''; }
+
+async function connect(chat) {
+  if (S.conns.has(chat.id)) return;
+  const c = {peers: new Set(), send() {}, leave() {}};
+  S.conns.set(chat.id, c);
+  const join = id => { c.peers.add(id); onJoin(chat); };
+  const leave = id => { c.peers.delete(id); render(); };
+  try {
+    if (LOCAL) localTransport(chat, c, join, leave);
+    else {
+      T = await loadTrystero();
+      const {joinRoom} = T;
+      if (S.conns.get(chat.id) !== c) return;           // чат успели удалить
+      const room = joinRoom({appId: APP_ID, password: chat.pass}, chat.room);
+      const act = room.makeAction('m');
+      act.onMessage = (data, info) => onData(chat, data);
+      room.onPeerJoin = join;
+      room.onPeerLeave = leave;
+      c.send = (t, d) => Promise.resolve().then(() => act.send({t, d})).catch(e => console.warn('send', e));
+      c.leave = () => { try { room.leave(); } catch (e) {} };
+    }
+    updateNet();
+  } catch (e) {
+    console.warn('connect', e);
+    if (S.conns.get(chat.id) === c) S.conns.delete(chat.id);
+    updateNet();
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(connectAll, 15000);
+  }
+}
+function connectAll() { for (const ch of S.chats.values()) connect(ch); }
+function disconnect(id) { const c = S.conns.get(id); if (c) { S.conns.delete(id); c.leave(); } }
+
+function localTransport(chat, c, join, leave) {
+  const me = uid(), bc = new BroadcastChannel('ochered-' + chat.room);
+  bc.onmessage = ({data: m}) => {
+    if (!m || m.from === me) return;
+    if (m.k === 'hi') { bc.postMessage({k: 'hi2', from: me}); join(m.from); }
+    else if (m.k === 'hi2') { if (!c.peers.has(m.from)) join(m.from); }
+    else if (m.k === 'bye') leave(m.from);
+    else if (m.k === 'd') onData(chat, m.p);
+  };
+  c.send = (t, d) => bc.postMessage({k: 'd', from: me, p: {t, d}});
+  c.leave = () => { bc.postMessage({k: 'bye', from: me}); bc.close(); };
+  addEventListener('pagehide', () => bc.postMessage({k: 'bye', from: me}));
+  bc.postMessage({k: 'hi', from: me});
+}
+
+/* ---------- почта через открытые узлы Nostr: подпись (BIP340), шифрование, события ---------- */
+const NX = (() => {
+  const P = 2n ** 256n - 2n ** 32n - 977n;
+  const N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+  const G = [0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n, 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n];
+  const mod = (a, m = P) => ((a % m) + m) % m;
+  function inv(a, m = P) { let [r0, r1, s0, s1] = [mod(a, m), m, 1n, 0n]; while (r1) { const q = r0 / r1; [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; } return mod(s0, m); }
+  function add(a, b) {
+    if (!a) return b; if (!b) return a;
+    const [x1, y1] = a, [x2, y2] = b;
+    if (x1 === x2 && mod(y1 + y2) === 0n) return null;
+    const l = x1 === x2 ? mod(3n * x1 * x1 * inv(2n * y1)) : mod((y2 - y1) * inv(x2 - x1));
+    const x3 = mod(l * l - x1 - x2); return [x3, mod(l * (x1 - x3) - y1)];
+  }
+  function mul(k) { let r = null, q = G; for (; k; k >>= 1n) { if (k & 1n) r = add(r, q); q = add(q, q); } return r; }
+  const enc = new TextEncoder();
+  const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  const unhex = h => Uint8Array.from(h.match(/../g), x => parseInt(x, 16));
+  const b32 = n => unhex(n.toString(16).padStart(64, '0'));
+  const num = b => BigInt('0x' + hex(b));
+  const cat = (...a) => { const o = new Uint8Array(a.reduce((s, x) => s + x.length, 0)); let i = 0; for (const x of a) { o.set(x, i); i += x.length; } return o; };
+  const sha = async b => new Uint8Array(await crypto.subtle.digest('SHA-256', b));
+  const tagged = async (tag, ...m) => { const t = await sha(enc.encode(tag)); return sha(cat(t, t, ...m)); };
+  async function keys(seedBytes) {            // секрет чата -> ключ подписи
+    const d0 = mod(num(await sha(seedBytes)), N - 1n) + 1n, pt = mul(d0);
+    return {d: pt[1] & 1n ? N - d0 : d0, px: b32(pt[0]), pk: hex(b32(pt[0]))};
+  }
+  async function sign(k, msg) {
+    const aux = crypto.getRandomValues(new Uint8Array(32));
+    const t = b32(k.d ^ num(await tagged('BIP0340/aux', aux)));
+    const k0 = mod(num(await tagged('BIP0340/nonce', t, k.px, msg)), N);
+    const R = mul(k0), kk = R[1] & 1n ? N - k0 : k0, rx = b32(R[0]);
+    const e = mod(num(await tagged('BIP0340/challenge', rx, k.px, msg)), N);
+    return hex(cat(rx, b32(mod(kk + e * k.d, N))));
+  }
+  async function event(k, kind, tags, content) {
+    const ev = {pubkey: k.pk, created_at: Math.floor(Date.now() / 1000), kind, tags, content};
+    const id = await sha(enc.encode(JSON.stringify([0, ev.pubkey, ev.created_at, ev.kind, ev.tags, ev.content])));
+    ev.id = hex(id); ev.sig = await sign(k, id); return ev;
+  }
+  const b64 = b => btoa(String.fromCharCode(...b)), unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const aesKey = async seedBytes => crypto.subtle.importKey('raw', await sha(seedBytes), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  async function seal(key, obj) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    return b64(cat(iv, new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv}, key, enc.encode(JSON.stringify(obj))))));
+  }
+  async function open(key, s) {
+    const b = unb64(s);
+    return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name: 'AES-GCM', iv: b.slice(0, 12)}, key, b.slice(12))));
+  }
+  return {keys, sign, event, aesKey, seal, open, enc};
+})();
+
+const RELAYS = Q.get('relay') ? Q.get('relay').split(',') : ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.snort.social', 'wss://nostr.oxtr.dev', 'wss://nostr-01.yakihonne.com'];
+const MAIL = !LOCAL || !!Q.get('relay');
+const KIND = 30078, KEEP = 14 * 86400;       // зашифрованные письма лежат на узлах не дольше 14 дней
+const nowSec = () => Math.floor(Date.now() / 1000);
+let DEVICE = '';
+const NXK = new Map();                        // ключи чатов: подпись и шифрование, выводятся из кода приглашения
+async function prepNX(chat) {
+  if (!NXK.has(chat.id)) NXK.set(chat.id, {k: await NX.keys(NX.enc.encode('ochered-sig:' + chat.pass)), key: await NX.aesKey(NX.enc.encode('ochered-enc:' + chat.pass))});
+  return NXK.get(chat.id);
+}
+const MB = {
+  socks: new Map(), seen: new Set(),
+  count() { let n = 0; for (const s of this.socks.values()) if (s.ok) n++; return n; },
+  start() { if (MAIL) for (const u of RELAYS) this.dial(u); },
+  dial(url) {
+    let ws; try { ws = new WebSocket(url); } catch (e) { return; }
+    const s = {ws, ok: false}; this.socks.set(url, s);
+    ws.onopen = () => { s.ok = true; for (const ch of S.chats.values()) this.req(s, ch); updateNet(); for (const ch of S.chats.values()) flushMail(ch); };
+    ws.onmessage = m => this.recv(m.data);
+    ws.onerror = () => {};
+    ws.onclose = () => { s.ok = false; updateNet(); setTimeout(() => this.dial(url), 15000); };
+  },
+  req(s, ch) {
+    const nx = NXK.get(ch.id); if (!nx || !s.ok) return;
+    try { s.ws.send(JSON.stringify(['REQ', 'c' + ch.id, {kinds: [KIND], authors: [nx.k.pk], since: nowSec() - KEEP}])); } catch (e) {}
+  },
+  watch(ch) { for (const s of this.socks.values()) this.req(s, ch); },
+  unwatch(ch) { for (const s of this.socks.values()) if (s.ok) try { s.ws.send(JSON.stringify(['CLOSE', 'c' + ch.id])); } catch (e) {} },
+  async recv(raw) {
+    let d; try { d = JSON.parse(raw); } catch (e) { return; }
+    if (!Array.isArray(d) || d[0] !== 'EVENT' || !d[2] || typeof d[2].id !== 'string' || this.seen.has(d[2].id)) return;
+    this.seen.add(d[2].id);
+    const chat = S.chats.get(String(d[1]).slice(1)), nx = chat && NXK.get(chat.id);
+    if (!nx || d[2].pubkey !== nx.k.pk) return;
+    let p; try { p = await NX.open(nx.key, d[2].content); } catch (e) { return; }   // чужое или повреждённое не расшифруется
+    if (!p || p.f === DEVICE) return;
+    onData(chat, {t: p.t, d: p.d}, true);
+  },
+  async post(ch, t, d) {
+    if (!this.count()) return false;
+    const nx = await prepNX(ch);
+    const ev = await NX.event(nx.k, KIND, [['d', uid()], ['expiration', String(nowSec() + KEEP)]], await NX.seal(nx.key, {f: DEVICE, t, d}));
+    this.seen.add(ev.id);
+    let n = 0; const msg = JSON.stringify(['EVENT', ev]);
+    for (const s of this.socks.values()) if (s.ok) try { s.ws.send(msg); n++; } catch (e) {}
+    return n > 0;
+  }
+};
+const mailBusy = new Set();
+async function flushMail(chat) {               // всё, что не дошло напрямую, уходит зашифрованным письмом через узлы
+  if (!MAIL || !MB.count() || mailBusy.has(chat.id) || !S.chats.has(chat.id)) return;
+  mailBusy.add(chat.id);
+  try {
+    const list = msgsOf(chat.id), on = isOnline(chat.id);
+    let changed = false;
+    for (const m of list.filter(m => m.out && m.status === 'queued' && !m.relayed && (!on || Date.now() - m.ts > 3500)))
+      if (await MB.post(chat, 'msg', {id: m.id, text: m.text, ts: m.ts})) { m.relayed = true; put('messages', m); changed = true; }
+    const acks = list.filter(m => !m.out && m.acked === false);
+    if (acks.length && await MB.post(chat, 'ack', {ids: acks.map(m => m.id)})) for (const m of acks) { m.acked = true; put('messages', m); }
+    const reads = list.filter(m => !m.out && m.status === 'read' && !m.reported);
+    if (reads.length && await MB.post(chat, 'read', {ids: reads.map(m => m.id)})) for (const m of reads) { m.reported = true; put('messages', m); }
+    if (!chat.helloSent && S.me.name && await MB.post(chat, 'hello', {name: S.me.name})) { chat.helloSent = true; put('chats', chat); }
+    if (changed) render();
+  } catch (e) { console.warn('mail', e); }
+  mailBusy.delete(chat.id);
+}
+function updateNet() {
+  if (performance.now() < 7000) { setTimeout(updateNet, 7100 - performance.now()); return; }
+  setNet(!LOCAL && !T && !MB.count() ? 'Нет связи с сетью. Сообщения копятся в очереди и уйдут, когда связь появится.' : '');
+}
+
+/* ---------- протокол: очередь, подтверждения, прочтение ---------- */
+function onJoin(chat) {
+  const c = S.conns.get(chat.id); if (!c) return;
+  c.send('hello', {name: S.me.name});
+  flush(chat);
+  reportRead(chat);
+  render();
+}
+function flush(chat) {
+  const c = S.conns.get(chat.id); if (!c || !c.peers.size) return;
+  for (const m of msgsOf(chat.id)) if (m.out && m.status === 'queued') c.send('msg', {id: m.id, text: m.text, ts: m.ts});
+}
+function onData(chat, p, viaMail) {
+  if (!p || typeof p !== 'object' || !S.chats.has(chat.id)) return;
+  const {t, d} = p, c = S.conns.get(chat.id), list = msgsOf(chat.id);
+  if (!d || typeof d !== 'object') return;
+  if (t === 'hello') {
+    const name = String(d.name || '').slice(0, 40);
+    if (name && chat.peerName !== name) { chat.peerName = name; put('chats', chat); }
+  } else if (t === 'msg') {
+    if (typeof d.id !== 'string' || d.id.length > 64 || typeof d.text !== 'string') return;
+    if (!list.some(m => m.id === d.id)) {
+      const m = {id: d.id, chatId: chat.id, out: false, text: d.text.slice(0, 20000), ts: Number(d.ts) || Date.now(), status: 'new', reported: false, acked: !viaMail};
+      list.push(m); list.sort((a, b) => a.ts - b.ts); put('messages', m);
+    }
+    if (!viaMail) c && c.send('ack', {ids: [d.id]});
+    if (S.active === chat.id && document.visibilityState === 'visible') markRead(chat);
+  } else if (t === 'ack' || t === 'read') {
+    if (!Array.isArray(d.ids)) return;
+    for (const m of list) if (m.out && d.ids.includes(m.id)) {
+      const next = t === 'read' ? 'read' : (m.status === 'queued' ? 'delivered' : m.status);
+      if (next !== m.status) { m.status = next; put('messages', m); }
+    }
+  } else return;
+  if (viaMail) flushMail(chat);
+  render();
+}
+function markRead(chat) {
+  let changed = false;
+  for (const m of msgsOf(chat.id)) if (!m.out && m.status === 'new') { m.status = 'read'; put('messages', m); changed = true; }
+  reportRead(chat);
+  return changed;
+}
+function reportRead(chat) {
+  const c = S.conns.get(chat.id); if (!c || !c.peers.size) { flushMail(chat); return; }
+  const pend = msgsOf(chat.id).filter(m => !m.out && m.status === 'read' && !m.reported);
+  if (!pend.length) return;
+  c.send('read', {ids: pend.map(m => m.id)});
+  for (const m of pend) { m.reported = true; put('messages', m); }
+}
+function sendText(text) {
+  const chat = S.chats.get(S.active); if (!chat) return;
+  const m = {id: uid(), chatId: chat.id, out: true, text, ts: Date.now(), status: 'queued'};
+  msgsOf(chat.id).push(m); put('messages', m);
+  const c = S.conns.get(chat.id);
+  if (c && c.peers.size) { c.send('msg', {id: m.id, text: m.text, ts: m.ts}); setTimeout(() => flushMail(chat), 4000); }
+  else flushMail(chat);
+  render(true);
+}
+setInterval(() => { for (const ch of S.chats.values()) { flush(ch); flushMail(ch); } }, 20000);   // повтор, если подтверждение потерялось
+
+/* ---------- чаты ---------- */
+async function addChat(parsed, name) {
+  if (S.chats.has(parsed.room)) return S.chats.get(parsed.room);
+  const chat = {id: parsed.room, room: parsed.room, pass: parsed.pass, code: parsed.code, name: name || '', peerName: '', createdAt: Date.now()};
+  S.chats.set(chat.id, chat);
+  await put('chats', chat);
+  await prepNX(chat); MB.watch(chat);
+  connect(chat);
+  return chat;
+}
+async function removeChat(id) {
+  disconnect(id);
+  if (S.chats.has(id)) MB.unwatch(S.chats.get(id));
+  NXK.delete(id);
+  for (const m of msgsOf(id)) del('messages', m.id);
+  S.msgs.delete(id); S.chats.delete(id); await del('chats', id);
+  if (S.active === id) openChat(null);
+  render();
+}
+const title = ch => ch.name || ch.peerName || 'Новый контакт';
+
+/* ---------- интерфейс ---------- */
+const COLORS = ['#A07C66', '#838B68', '#A8925F', '#877A8E', '#74888F', '#9E8282', '#8E8470'];   // глина, мох, пшеница, вереск, дождь, шиповник, камень
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const hhmm = ts => new Date(ts).toLocaleTimeString('ru', {hour: '2-digit', minute: '2-digit'});
+const dayLabel = ts => {
+  const d = new Date(ts), n = new Date(), y = new Date(Date.now() - 864e5);
+  if (d.toDateString() === n.toDateString()) return 'Сегодня';
+  if (d.toDateString() === y.toDateString()) return 'Вчера';
+  return d.toLocaleDateString('ru', {day: 'numeric', month: 'long', year: d.getFullYear() === n.getFullYear() ? undefined : 'numeric'});
+};
+const ICON = {
+  queued: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  relayed: '<svg viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg>',
+  delivered: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  read: '<svg viewBox="0 0 24 24"><path d="M2 12.5l4.5 4.5L16 7.5M11 16l1.5 1.5L22 7.5"/></svg>'
+};
+const STATUS_TEXT = {queued: 'Ждёт на этом устройстве', relayed: 'Отправлено, ждёт собеседника', delivered: 'Доставлено', read: 'Прочитано'};
+const shown = m => m.status === 'queued' && m.relayed ? 'relayed' : m.status;
+
+function avatar(ch) {
+  const a = el('div', 'ava' + (isOnline(ch.id) ? ' dot' : ''), (title(ch).trim()[0] || '?').toUpperCase());
+  let h = 0; for (const c of ch.id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  a.style.background = COLORS[h % COLORS.length];
+  if (h % 3) a.classList.add('s' + (h % 3));
+  return a;
+}
+function renderList() {
+  const box = $('list'); box.textContent = '';
+  const chats = [...S.chats.values()].sort((a, b) => lastTs(b) - lastTs(a));
+  if (!chats.length) { box.append(el('div', 'empty', 'Пока нет чатов. Нажми «+», чтобы создать приглашение или ввести код от собеседника.')); return; }
+  let unreadAll = 0;
+  for (const ch of chats) {
+    const list = msgsOf(ch.id), last = list[list.length - 1], unread = list.filter(m => !m.out && m.status === 'new').length;
+    unreadAll += unread;
+    const row = el('button', 'row' + (S.active === ch.id ? ' on' : ''));
+    row.type = 'button'; row.dataset.chat = ch.id;
+    const mid = el('div', 'mid');
+    mid.append(el('div', 'nm', title(ch)), el('div', 'pv', last ? (last.out ? 'Ты: ' : '') + last.text : 'Сообщений пока нет'));
+    const rt = el('div', 'rt');
+    rt.append(el('span', '', last ? hhmm(last.ts) : ''));
+    if (unread) rt.append(el('span', 'badge', unread));
+    row.append(avatar(ch), mid, rt);
+    row.onclick = () => openChat(ch.id);
+    box.append(row);
+  }
+  document.title = (unreadAll ? '(' + unreadAll + ') ' : '') + 'Чат — прототип';
+}
+const lastTs = ch => { const l = msgsOf(ch.id); return l.length ? l[l.length - 1].ts : ch.createdAt; };
+
+function renderChat(forceBottom) {
+  const ch = S.chats.get(S.active), has = !!ch;
+  $('nochat').hidden = has; $('head').hidden = $('msgs').hidden = $('form').hidden = !has;
+  if (!has) return;
+  const on = isOnline(ch.id), list = msgsOf(ch.id), box = $('msgs');
+  $('hName').textContent = title(ch);
+  const queued = list.filter(m => m.out && m.status === 'queued' && !m.relayed).length, sent = list.filter(m => m.out && m.status === 'queued' && m.relayed).length;
+  $('hStatus').textContent = on ? 'в сети' : queued ? 'не в сети, в очереди: ' + queued : sent ? 'не в сети, ждут собеседника: ' + sent : 'не в сети';
+  const atBottom = forceBottom || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.textContent = '';
+  if (!list.length) {
+    const inv = el('div', 'invite');
+    inv.append(el('div', '', 'Чтобы начать переписку, передай собеседнику код приглашения. Он вводит его у себя: «+» → «Ввести код».'), el('div', 'code', fmtCode(ch.code)),
+      el('div', '', 'Писать можно уже сейчас: сообщения дойдут, даже если вы бываете в сети в разное время.'));
+    box.append(inv);
+  }
+  let day = '';
+  for (const m of list) {
+    const d = dayLabel(m.ts);
+    if (d !== day) { day = d; box.append(el('div', 'day', d)); }
+    const b = el('div', 'm' + (m.out ? ' out' : '') + (m.out && m.status === 'queued' && !m.relayed ? ' q' : '') + (m.out && m.status === 'read' ? ' r' : ''));
+    b.dataset.id = m.id; b.dataset.status = shown(m);
+    b.append(el('div', '', m.text));
+    const meta = el('div', 'meta'); meta.append(el('span', '', hhmm(m.ts)));
+    if (m.out) { const st = shown(m), s = el('span'); s.innerHTML = ICON[st]; s.title = STATUS_TEXT[st]; s.setAttribute('aria-label', STATUS_TEXT[st]); meta.append(s); }
+    b.append(meta); box.append(b);
+  }
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+function render(forceBottom) { renderChat(forceBottom); renderList(); }
+
+function openChat(id) {
+  S.active = id;
+  document.body.classList.toggle('open', !!id);
+  if (id) markRead(S.chats.get(id));
+  render(true);
+  if (id && matchMedia('(min-width:721px)').matches) $('text').focus();
+}
+
+/* ---------- обработчики ---------- */
+$('back').onclick = () => openChat(null);
+$('form').onsubmit = e => {
+  e.preventDefault();
+  const t = $('text').value.trim(); if (!t) return;
+  sendText(t); $('text').value = ''; grow();
+};
+const grow = () => { const t = $('text'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 140) + 'px'; };
+$('text').oninput = grow;
+$('text').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('form').requestSubmit(); } };
+document.addEventListener('visibilitychange', () => {
+  const ch = S.chats.get(S.active);
+  if (ch && document.visibilityState === 'visible' && markRead(ch)) render();
+});
+addEventListener('online', connectAll);
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+
+let newMode = 'create';
+function setNewMode(m) {
+  newMode = m;
+  $('tCreate').setAttribute('aria-selected', m === 'create'); $('tJoin').setAttribute('aria-selected', m === 'join');
+  $('joinBox').hidden = m !== 'join'; $('newErr').textContent = '';
+  $('newHint').textContent = m === 'create'
+    ? 'Создам чат и код приглашения. Код передай собеседнику любым удобным способом.'
+    : 'Вставь код, который тебе прислал собеседник.';
+  $('newOk').textContent = m === 'create' ? 'Создать' : 'Подключиться';
+}
+$('tCreate').onclick = () => setNewMode('create');
+$('tJoin').onclick = () => setNewMode('join');
+$('bNew').onclick = () => { $('iCode').value = $('iPeer').value = ''; setNewMode('create'); $('dNew').showModal(); };
+$('fNew').onsubmit = async e => {
+  e.preventDefault();
+  const parsed = newMode === 'create' ? parseCode(genCode()) : parseCode($('iCode').value);
+  if (!parsed) { $('newErr').textContent = 'Код не подходит: в нём должно быть 30 букв и цифр.'; return; }
+  if ($('newOk').disabled) return;
+  $('newOk').disabled = true;
+  try { const ch = await addChat(parsed, $('iPeer').value.trim()); $('dNew').close(); openChat(ch.id); }
+  finally { $('newOk').disabled = false; }
+};
+
+$('bChat').onclick = () => {
+  const ch = S.chats.get(S.active); if (!ch) return;
+  $('iRename').value = ch.name; $('iRename').placeholder = ch.peerName || 'Имя';
+  $('chatCode').textContent = fmtCode(ch.code); $('bCopy').textContent = 'Скопировать код';
+  $('dChat').showModal();
+};
+$('bRenameOk').onclick = () => {
+  const ch = S.chats.get(S.active);
+  if (ch) { ch.name = $('iRename').value.trim(); put('chats', ch); }
+  $('dChat').close(); render();
+};
+$('bCopy').onclick = async () => {
+  const ch = S.chats.get(S.active); if (!ch) return;
+  try { await navigator.clipboard.writeText(fmtCode(ch.code)); $('bCopy').textContent = 'Скопировано'; }
+  catch (e) { $('bCopy').textContent = 'Выдели код и скопируй вручную'; }
+};
+$('bDelete').onclick = () => {
+  if (!confirm('Удалить чат и всю переписку с этого устройства? Вернуть её будет нельзя.')) return;
+  $('dChat').close(); removeChat(S.active);
+};
+
+$('bSettings').onclick = () => {
+  $('iMe').value = S.me.name; $('iSeason').value = seasonPref;
+  $('profNote').hidden = !PROFILE; $('profNote').textContent = 'Тестовый профиль: ' + PROFILE;
+  $('diag').textContent = diag();
+  $('dSettings').showModal();
+};
+function diag() {
+  const out = ['Режим: ' + (LOCAL ? 'тестовый, без интернета' : 'через интернет')];
+  if (!LOCAL) {
+    out.push('Интернет на устройстве: ' + (navigator.onLine ? 'есть' : 'нет'));
+    out.push('Библиотека связи: ' + (T ? 'загружена' : 'не загружена'));
+    try {
+      if (T && typeof T.getRelaySockets === 'function') {
+        const s = Object.values(T.getRelaySockets() || {});
+        out.push('Узлы знакомства на связи: ' + s.filter(w => w && w.readyState === 1).length + ' из ' + s.length);
+      }
+    } catch (e) {}
+    out.push('Почтовые узлы на связи: ' + MB.count() + ' из ' + RELAYS.length);
+    out.push('Прямые соединения (WebRTC): ' + (window.RTCPeerConnection ? 'поддерживаются' : 'не поддерживаются'));
+  }
+  const on = [...S.chats.keys()].filter(isOnline).length;
+  out.push('Собеседников в сети: ' + on + ' из ' + S.chats.size);
+  return out.join('\n');
+}
+async function saveName(v) {
+  v = v.trim().slice(0, 40); if (!v) return;
+  S.me.name = v; await put('kv', S.me, 'me');
+  for (const [id, c] of S.conns) if (c.peers.size) c.send('hello', {name: v});
+}
+$('bMeOk').onclick = async () => { await saveName($('iMe').value); $('dSettings').close(); };
+$('fName').onsubmit = () => saveName($('iName').value);
+$('dName').addEventListener('cancel', e => e.preventDefault());
+
+$('bExport').onclick = () => {
+  const data = {app: APP_ID, v: 1, me: S.me, chats: [...S.chats.values()], messages: [...S.msgs.values()].flat()};
+  const a = el('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type: 'application/json'}));
+  a.download = 'chat-backup-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
+$('bImport').onclick = () => $('iFile').click();
+$('iFile').onchange = async () => {
+  const f = $('iFile').files[0]; $('iFile').value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.app !== APP_ID || !Array.isArray(d.chats) || !Array.isArray(d.messages)) throw 0;
+    if (!confirm('Заменить все чаты на этом устройстве содержимым копии?')) return;
+    for (const id of [...S.chats.keys()]) await removeChat(id);
+    if (d.me && d.me.name) await saveName(String(d.me.name));
+    for (const c of d.chats) { const p = parseCode(c.code); if (!p) continue;
+      const ch = await addChat(p, String(c.name || '')); ch.peerName = String(c.peerName || ''); ch.createdAt = Number(c.createdAt) || Date.now(); put('chats', ch); }
+    for (const m of d.messages) if (m && S.chats.has(m.chatId) && typeof m.id === 'string' && typeof m.text === 'string') {
+      const mm = {id: m.id, chatId: m.chatId, out: !!m.out, text: m.text, ts: Number(m.ts) || Date.now(), status: String(m.status), reported: !!m.reported, relayed: !!m.relayed, acked: m.acked !== false};
+      msgsOf(mm.chatId).push(mm); put('messages', mm);
+    }
+    for (const l of S.msgs.values()) l.sort((a, b) => a.ts - b.ts);
+    $('dSettings').close(); render();
+  } catch (e) { alert('Не получилось прочитать файл: это не резервная копия этого чата.'); }
+};
+
+
+/* ---------- времена года ---------- */
+const SPRIG = {
+  autumn: '<path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14z"/><path d="M5 19l9-9M9.5 14.5V11M12 12V8.5M9.5 14.5H13"/>',
+  winter: '<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M9.6 4.6L12 7l2.4-2.4M9.6 19.4L12 17l2.4 2.4"/>',
+  spring: '<path d="M12 21v-8"/><path d="M12 13c0-4-3-6.5-7-6.5 0 4 3 6.5 7 6.5zM12 15c0-3 2.5-5 6-5 0 3-2.5 5-6 5z"/>',
+  summer: '<path d="M4 20C4 9 9 4 20 4c0 11-5 16-16 16z"/><path d="M4 20L15 9M8.5 15.5V10.5M8.5 15.5h5M12 12V7.5M12 12h4.5"/>'
+};
+const SHAPE = {
+  autumn: ['M9.5 31.0L15.8 31.7L17.6 31.6L22.3 30.6L22.8 29.2L27.0 27.7L26.7 25.6L30.3 23.6L29.7 21.1L32.8 18.6L32.1 16.0L34.6 12.9L34.0 10.5L36.0 6.9L35.5 4.5L33.1 4.1L29.6 6.1L27.1 5.6L24.1 8.1L21.5 7.5L19.0 10.6L16.5 10.0L14.6 13.7L12.4 13.5L11.1 17.7L9.6 18.2L8.8 22.9L8.7 24.7Z', 'M4.5 36L9.5 31'],
+  summer: ['M9.5 31C3.5 19 12 5.5 35.5 4.5C35.5 27 21.5 37 9.5 31Z', 'M4.5 36L9.5 31'],
+  winter: ['M20 2.5L34.5 10.5L35.5 28L21 37.5L5.5 30L5 12Z', ''],
+  spring: ['M20 2.5C27 8 33.5 15.5 33.5 23.5C33.5 31.5 27.5 36 20 36C12.5 36 6.5 31.5 6.5 23.5C6.5 15.5 13 8 20 2.5Z', 'M20 36V39.5']
+};
+const GLYPH = {send: '<path d="M12 19V6M6 11.5L12 5.5l6 6"/>', bNew: '<path d="M12 5v14M5 12h14"/>'};
+let seasonPref = '';
+function seasonNow() { const m = new Date().getMonth(); return m < 2 || m === 11 ? 'winter' : m < 5 ? 'spring' : m < 8 ? 'summer' : 'autumn'; }
+function applySeason() {
+  const forced = Q.get('season'), s = SPRIG[forced] ? forced : SPRIG[seasonPref] ? seasonPref : seasonNow();
+  document.documentElement.dataset.season = s;
+  $('sprig').innerHTML = '<svg viewBox="0 0 24 24">' + SPRIG[s] + '</svg>';
+  for (const id of ['send', 'bNew']) $(id).innerHTML = '<svg class="shape" viewBox="0 0 40 40" aria-hidden="true"><path class="body" d="' + SHAPE[s][0] + '"/><path class="veins" d="' + SHAPE[s][1] + '"/></svg><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true">' + GLYPH[id] + '</svg>';
+}
+$('iSeason').onchange = () => { seasonPref = $('iSeason').value; put('kv', seasonPref, 'season'); applySeason(); };
+setInterval(applySeason, 3600e3);
+applySeason();
+
+/* ---------- запуск ---------- */
+(async () => {
+  try { db = await openDB(); }
+  catch (e) { document.body.textContent = 'Браузер не дал доступ к локальному хранилищу. Попробуй обычное (не приватное) окно.'; return; }
+  S.me = (await getKV('me')) || {name: ''};
+  seasonPref = (await getKV('season')) || ''; applySeason();
+  DEVICE = await getKV('device'); if (!DEVICE) { DEVICE = uid(); await put('kv', DEVICE, 'device'); }
+  for (const c of await all('chats')) { S.chats.set(c.id, c); await prepNX(c); }
+  for (const m of await all('messages')) if (S.chats.has(m.chatId)) msgsOf(m.chatId).push(m);
+  for (const l of S.msgs.values()) l.sort((a, b) => a.ts - b.ts);
+  render();
+  if (!S.me.name) $('dName').showModal();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  MB.start();
+  connectAll();
+})();
+</script>
+</body>
+</html>
